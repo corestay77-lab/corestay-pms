@@ -6,11 +6,14 @@ Satu komputer utama dan beberapa perangkat lain dapat membuka hotel yang sama. S
 
 ## Pilihan arsitektur
 
-- **Database pusat:** Supabase PostgreSQL.
-- **Login dan hak akses:** Supabase Auth + `hotel_memberships`.
-- **Sinkronisasi:** Realtime untuk pembaruan layar antar-perangkat; transaksi tetap disimpan ke PostgreSQL.
-- **Keamanan:** Row Level Security (RLS) berdasarkan `hotel_id`; jangan pernah menaruh service-role key di browser.
-- **Hosting:** Vercel tetap menyajikan aplikasi web.
+Vercel menyediakan hosting dan Functions; database SQL pusat disediakan melalui integrasi Marketplace. Vercel Postgres dan Vercel KV versi lama sudah sunset. Untuk CoreStay dipilih Neon Postgres melalui Vercel Marketplace agar instalasi, koneksi environment, dan pengelolaan dilakukan dari Vercel Dashboard. Tidak menggunakan Supabase.
+
+
+- **Database pusat:** Neon Postgres dari Vercel Marketplace, dibuat dan dihubungkan dari Vercel Dashboard. Tidak menggunakan Supabase.
+- **Login dan hak akses:** CoreStay API pada Vercel Functions menggunakan tabel `app_users`, `user_sessions`, dan `hotel_memberships`; password wajib di-hash dan session cookie HttpOnly, Secure, SameSite.
+- **Sinkronisasi:** semua perangkat membaca/menulis melalui API Vercel ke PostgreSQL pusat; layar memperbarui data setelah server mengonfirmasi dan melakukan refresh berkala.
+- **Keamanan:** `DATABASE_URL` hanya tersedia pada Vercel Functions. API memeriksa session, `hotel_id`, role, dan izin; browser tidak pernah mengakses database langsung.
+- **Hosting/backend:** Vercel menyajikan aplikasi dan menjalankan API melalui Vercel Functions.
 - **Transaksi penting:** gunakan PostgreSQL RPC/transaction untuk posting, pembayaran, check-out, penerimaan barang, pembayaran supplier/customer, dan Night Audit.
 
 ## Menu dan keterkaitan modul
@@ -31,6 +34,8 @@ Account Receivable (CLGT/AR/BK_PIUT/BYRPIUT/KWITANSI) menerima tagihan City Ledg
 ACCOUNT/ACC_D menjadi Chart of Accounts. JURNAL/JURNAL_D menjadi jurnal header/detail. Kas masuk/keluar, piutang, hutang, persediaan, pendapatan FO, service dan pajak harus diposting melalui pemetaan akun yang dapat diatur, bukan akun yang ditanam permanen di kode.
 
 ## Aturan integrasi wajib
+
+Semua query database dilakukan di server melalui Vercel Functions dengan parameterized SQL. Database credential tidak pernah dikirim ke browser. Gunakan transaksi SQL atomik untuk pembayaran, check-out, penerimaan barang, posting stok, dan Night Audit.
 
 1. Setiap dokumen memiliki ID internal UUID dan nomor dokumen yang terlihat pengguna.
 2. Setiap posting membawa `hotel_id`, tanggal bisnis, modul sumber, ID sumber, pengguna, dan waktu.
@@ -54,11 +59,11 @@ ACCOUNT/ACC_D menjadi Chart of Accounts. JURNAL/JURNAL_D menjadi jurnal header/d
 
 ## Tahapan implementasi
 
-### Tahap 1 — Infrastruktur bersama
-- Buat project Supabase baru.
-- Jalankan migration `supabase/migrations/202611160001_shared_pms_core.sql`.
-- Buat satu record hotel dan membership owner.
-- Konfigurasikan URL dan anon key melalui environment variables Vercel.
+### Tahap 1 — Infrastruktur Vercel
+- Dari Vercel Dashboard project CoreStay, pasang integrasi Neon Postgres melalui Marketplace dan buat database baru khusus CoreStay.
+- Hubungkan database ke project dan pastikan `DATABASE_URL` tersedia sebagai server-only Environment Variable.
+- Jalankan migration `db/migrations/202611160001_shared_pms_core.sql` hanya pada database baru yang kosong setelah review.
+- Bootstrap akun owner secara aman melalui API satu kali.
 
 ### Tahap 2 — Migrasi aman
 - Tambahkan halaman export/backup dari localStorage.
@@ -67,10 +72,10 @@ ACCOUNT/ACC_D menjadi Chart of Accounts. JURNAL/JURNAL_D menjadi jurnal header/d
 - Rekonsiliasi total folio, saldo deposit, stok, AP, AR, dan trial balance.
 
 ### Tahap 3 — Multi-device
-- Login per pengguna dan role.
-- Semua operasi menulis ke database pusat.
-- Realtime menyegarkan layar antar-perangkat.
-- Uji dua perangkat secara bersamaan, konflik nomor dokumen, retry jaringan, dan audit trail.
+- Login per pengguna dan role melalui Vercel Functions.
+- Semua operasi membaca/menulis database pusat melalui API Vercel.
+- Perangkat lain memperbarui tampilan melalui refresh berkala setelah transaksi terkonfirmasi.
+- Uji dua perangkat bersamaan, konflik nomor dokumen, retry jaringan, dan audit trail.
 
 ### Tahap 4 — Cutover
 - Jalankan paralel dengan mode baca/perbandingan.
@@ -81,5 +86,5 @@ ACCOUNT/ACC_D menjadi Chart of Accounts. JURNAL/JURNAL_D menjadi jurnal header/d
 
 - Jangan menghapus key localStorage, menjalankan reset data, atau mengganti seed master lama.
 - Jangan menjalankan migration ini pada database produksi yang sudah berisi data tanpa backup dan review.
-- Jangan menaruh Supabase service-role key di `app.js`, HTML, atau browser.
+- Jangan menaruh `DATABASE_URL`, password database, session secret, atau kredensial admin di `app.js`, HTML, atau browser.
 - Jangan menganggap deployment Vercel saja membuat data tersinkron antar-perangkat; database pusat harus dikonfigurasi.
