@@ -531,7 +531,7 @@ begin
       elsif t = 'legacy_data_snapshots' then
         write_roles := array['owner','admin'];
       elsif t = 'audit_events' then
-        write_roles := array['owner','admin','auditor'];
+        write_roles := array['owner','admin'];
       else
         write_roles := array['owner','admin'];
       end if;
