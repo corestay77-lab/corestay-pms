@@ -1,24 +1,31 @@
-# Persiapan database bersama CoreStay
+# Persiapan database bersama CoreStay di Vercel
 
-Dokumen ini menjelaskan langkah pemilik project sebelum aplikasi dihubungkan ke database pusat.
+CoreStay memakai Vercel untuk hosting aplikasi dan API, dengan Neon Postgres yang dipasang melalui Vercel Marketplace sebagai database pusat. Tidak menggunakan Supabase.
 
-1. Buat project Supabase baru khusus CoreStay PMS (jangan gunakan database lain yang sudah berisi data).
-2. Simpan Project URL dan anon/public key. Jangan kirim service-role key melalui chat dan jangan memasukkannya ke file frontend.
-3. Pastikan akun pemilik sudah dibuat di Supabase Auth.
-4. Setelah migration schema disetujui, jalankan file SQL melalui Supabase SQL Editor.
-5. Buat satu hotel dan membership untuk akun owner. Proses bootstrap owner harus dilakukan secara aman oleh pemilik project; jangan membuka pendaftaran admin publik.
-6. Masukkan Project URL dan anon key ke Vercel Environment Variables.
-7. Jangan aktifkan sinkronisasi tulis-menulis sebelum snapshot localStorage lama diekspor dan direkonsiliasi.
+## Langkah pemilik project
+
+1. Buka Vercel Dashboard → project `corestay-pms` → Storage/Marketplace.
+2. Pilih integrasi **Neon Postgres** dan buat database baru khusus CoreStay PMS. Jangan hubungkan database lain yang sudah berisi data.
+3. Pilih region terdekat yang tersedia dan hubungkan database ke project CoreStay.
+4. Pastikan `DATABASE_URL` tersedia sebagai Environment Variable server-side di Vercel. Jangan gunakan prefix `NEXT_PUBLIC_` dan jangan kirim nilainya melalui chat.
+5. Setelah API dan migration direview, jalankan `db/migrations/202611160001_shared_pms_core.sql` pada database baru yang kosong.
+6. Buat akun owner melalui proses bootstrap satu kali yang disediakan API; jangan membuka pendaftaran admin publik.
+7. Deploy ulang project setelah environment variable tersedia.
 
 ## Data yang tetap aman
 
-Aplikasi yang sekarang memakai browser localStorage key `corestay-pms-v2`. Nilai ini tidak boleh dihapus. Migration cloud menyediakan tabel `legacy_data_snapshots` untuk menyimpan salinan JSON asli sebelum pemetaan ke tabel transaksi.
+Aplikasi saat ini memakai browser localStorage key `corestay-pms-v2`. Nilai ini tidak boleh dihapus atau ditimpa selama pembangunan. Sebelum cutover, aplikasi harus mengekspor snapshot JSON asli, menyimpan checksum, lalu memetakan data ke tabel baru dan merekonsiliasi jumlah record serta saldo kontrol.
 
-## Yang perlu disiapkan untuk tahap integrasi berikutnya
+Database pusat tidak mengambil alih transaksi sampai backup, import, dan pengujian multi-perangkat disetujui pemilik.
 
-- Project URL Supabase.
-- Anon/public key (boleh ditaruh di konfigurasi frontend; bukan service-role key).
-- Email akun owner yang akan dipakai login.
-- Persetujuan untuk menjalankan migration schema pada project Supabase baru yang kosong.
+## Keamanan
 
-Jangan pernah mengirim password atau service-role key.
+- `DATABASE_URL` dan session secret hanya digunakan di Vercel Functions.
+- Password di-hash di server; tidak disimpan sebagai teks biasa.
+- Browser tidak berkomunikasi langsung dengan database.
+- Setiap endpoint memeriksa session, hotel, role, dan izin modul.
+- Jangan pernah mengirim password, database URL, atau secret melalui chat.
+
+## Status
+
+Belum ada database yang dibuat, belum ada SQL yang dijalankan, dan belum ada data lama yang dipindahkan. Ini adalah rencana persiapan; produksi tetap memakai sistem yang ada sampai cutover disetujui.
