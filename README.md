@@ -1,4 +1,4 @@
-# CoreStay PMS v2
+# CoreStay PMS v3 (FO → Back Office terhubung penuh)
 
 PMS hotel berbasis web statis (tanpa build, tanpa dependensi). Mengadopsi alur & format data aplikasi HOTELINDO (Visual FoxPro: FO.EXE + BO.EXE) dari arsip `HOTELINDO.rar` dan `FO-DBFS.rar`.
 Data tersimpan di browser (localStorage). Master (kamar, tarif, kode tarif, item POS, customer, kota, negara) diambil dari data asli di `seed.js`.
@@ -44,26 +44,30 @@ Struktur menu EXE tidak bisa dibaca (terkompilasi), sehingga menu disusun dari t
 ### Peta akun (no_kira.MEM)
 Kas 110.01 · Piutang usaha 130.01 · Advance/Titipan 400 · Hutang 320 · Persediaan 750 · Kamar 701 · F&B 702.01, Room Service 702.02, Banquet 702.03, Lounge 702.04, Minibar 702.05 · Laundry 707.01 · Lain 705.05 · Service 500.01 · Pajak 500.02. Akun `130.02 Guest Ledger` adalah tambahan CoreStay.
 
-### Alur data
+### Alur data FO → Back Office (terimplementasi)
 ```
-Reservasi ─check-in→ G_HOUSE (+GUEST) ─→ MST_BILL (folio)
-     ▲                     │  Deposit R/E → ADVDEPO
- R_RATE/R_RATE2            │  POS Outlet (SLONA…) → baris D
-                           ▼
-        Night Audit: post RM+BF → jurnal pendapatan harian → DAYSAL/STISTIK → tanggal bisnis +1
-                           ▼
-        Check-out: Tunai/Kartu/QRIS/Transfer  atau  City Ledger (CLGT)
-                                                      → Kwitansi → Bayar → Terima Kas → BK_PIUT
-                           ▼
-                 Jurnal GL → Laba Rugi Hotel
+Reservasi → Check-in (G_HOUSE+GUEST) → Folio (MST_BILL)
+   Deposit/A-D ─────────────► Jurnal: Dr Kas/Bank, Cr 400 Advance ─┐
+   POS Outlet ─ ke kamar ───► baris D di folio                    │
+              ─ bayar langsung► Jurnal: Dr Kas/Bank, Cr Guest Ledger
+              ─ item bertaut stok ► FIFO keluar → Jurnal HPP: Dr 600.01, Cr 750 Persediaan
+Night Audit: post RM+BF → Jurnal pendapatan (Dr Guest Ledger; Cr 701/702.x/707/705, Service 500.01, Pajak 500.02)
+             → potong amenities HK otomatis (stok per kamar/malam) → statistik harian → tanggal bisnis +1
+Check-out:  alokasi A/D (Dr 400, Cr Guest Ledger) → sisa: Tunai/Kartu/QRIS/Transfer (Dr Kas/Bank)
+            atau City Ledger (Dr 130.01) → CLGT → Kwitansi → Pembayaran → Bukti terima → Buku Piutang
+Back Office: Pembelian kredit (Dr 750, Cr 320 Hutang) / tunai (Cr Kas/Bank) → lapis FIFO + kartu stok
+             Bayar hutang (Dr 320, Cr Kas/Bank) · Opname (selisih ke 600.04) · Pengeluaran (Biaya Ops 600.03 / Lain 600.09 / Aktiva 180)
+             Penerimaan lain (Cr 705.05) · Setor kas ke bank
+Semua jurnal yang menyentuh Kas/Bank otomatis masuk Buku Kas/Bank → Laba Rugi Hotel & Neraca Saldo
+Rekonsiliasi FO⇄BO: GL vs sub-ledger (Guest Ledger, A/D, Piutang, Persediaan, Hutang, 4 akun kas/bank)
 ```
 
 ### Kode yang disimpulkan (bukan dari teks program)
 PAYM: 1 Cash, 2 C.Card, 3 City Ledger, 4 Transfer, 5 D.Card (6 QRIS, 7 E-Wallet menurut kolom DAYSAL). ST_ROOM: 1 VC, 4 hunian, 5 OOO, 3 VD (inferensi). Tarif 1-4 pada R_RATE belum bisa dipastikan maknanya (rack, weekend, korporat, dst).
 
-## Pengujian (41 skenario lulus)
-Rumus pajak (cocok R_RATE), double-booking, kamar OOO/terisi/VD, A/D dan refund, POS ke kamar dan bayar langsung, dua kali night audit, check-out City Ledger, kwitansi, pelunasan, bayar ganda ditolak, walk-in, no-show otomatis, banquet bentrok, stok, semua jurnal balance, Guest Ledger dan Piutang nol, 14 menu tampil.
-Pengujian dilakukan lewat simulasi Node (bukan browser sungguhan).
+## Pengujian (54 skenario lulus)
+Rumus pajak (cocok R_RATE), double-booking, kamar OOO/terisi/VD, A/D dan refund, POS ke kamar dan bayar langsung, stok bertaut POS (HPP FIFO dua lapis harga), jual melebihi stok ditolak, amenities otomatis, pembelian tunai/kredit, bayar hutang (ganda ditolak), pengeluaran melebihi saldo ditolak, setor ke bank, opname, dua kali night audit, check-out City Ledger, kwitansi, pelunasan, walk-in, no-show, banquet bentrok, semua jurnal balance, 9 pos rekonsiliasi selisih nol, 15 menu tampil.
+Pengujian lewat simulasi Node, belum di browser sungguhan.
 
 ## Belum tercakup
-Integrasi key-card/PABX, cetak registrasi/bill/kwitansi, split folio, multi-user, import langsung data DBF, void/reprint POS, kartu stok FIFO/opname lengkap, laporan per segmen (STISTIK 218 kolom), multi-user dan database server.
+Integrasi key-card/PABX, cetak registrasi/bill/kwitansi, split folio, void/reprint POS, laporan per segmen (STISTIK 218 kolom), import langsung DBF, multi-user/database server, resep (satu item POS = banyak bahan), nomor akun bank selain 140.09 (140.10 dan 140.11 adalah asumsi), neraca format lengkap.
