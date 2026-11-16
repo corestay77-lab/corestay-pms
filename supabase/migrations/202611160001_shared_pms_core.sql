@@ -489,9 +489,11 @@ create index if not exists idx_stock_movements_hotel_item_date on public.stock_m
 create index if not exists idx_gl_journals_hotel_date on public.gl_journals(hotel_id, journal_date);
 create index if not exists idx_audit_events_hotel_time on public.audit_events(hotel_id, occurred_at desc);
 
--- Enable row-level security for every tenant-owned table.
+-- Enable row-level security and module-specific write permissions.
 do $$
-declare t text;
+declare
+  t text;
+  write_roles text[];
 begin
   foreach t in array array[
     'hotels','hotel_memberships','rooms','rate_codes','guests','customers','suppliers',
@@ -514,8 +516,29 @@ begin
       execute 'drop policy if exists membership_admin_manage on public.hotel_memberships';
       execute 'create policy membership_admin_manage on public.hotel_memberships for all using (public.has_hotel_role(hotel_id, array[''owner'',''admin''])) with check (public.has_hotel_role(hotel_id, array[''owner'',''admin'']))';
     else
-      execute format('drop policy if exists tenant_member_access on public.%I', t);
-      execute format('create policy tenant_member_access on public.%I for all using (public.is_hotel_member(hotel_id)) with check (public.is_hotel_member(hotel_id))', t);
+      if t in ('rooms','rate_codes','guests','customers','suppliers') then
+        write_roles := array['owner','admin','front_office','accounting'];
+      elsif t in ('reservations','reservation_rooms','stays','folios','folio_lines','deposits','daily_audits') then
+        write_roles := array['owner','admin','front_office','accounting'];
+      elsif t in ('pos_checks','pos_check_lines','banquet_bookings') then
+        write_roles := array['owner','admin','front_office','outlet'];
+      elsif t in ('inventory_items','stock_movements') then
+        write_roles := array['owner','admin','inventory','purchasing','accounting'];
+      elsif t in ('purchase_orders','purchase_order_lines') then
+        write_roles := array['owner','admin','purchasing','inventory','accounting'];
+      elsif t in ('ap_invoices','ap_payments','ar_invoices','ar_receipts','cash_accounts','cash_transactions','gl_accounts','gl_journals','gl_journal_lines') then
+        write_roles := array['owner','admin','accounting'];
+      elsif t = 'legacy_data_snapshots' then
+        write_roles := array['owner','admin'];
+      elsif t = 'audit_events' then
+        write_roles := array['owner','admin','auditor'];
+      else
+        write_roles := array['owner','admin'];
+      end if;
+      execute format('drop policy if exists tenant_member_read on public.%I', t);
+      execute format('create policy tenant_member_read on public.%I for select using (public.is_hotel_member(hotel_id))', t);
+      execute format('drop policy if exists tenant_role_write on public.%I', t);
+      execute format('create policy tenant_role_write on public.%I for all using (public.has_hotel_role(hotel_id, %L::text[])) with check (public.has_hotel_role(hotel_id, %L::text[]))', t, write_roles, write_roles);
     end if;
   end loop;
 end $$;
