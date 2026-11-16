@@ -45,28 +45,8 @@ create table if not exists public.hotel_memberships (
   unique (hotel_id, user_id)
 );
 
-create or replace function public.is_hotel_member(target_hotel uuid)
-returns boolean
-language sql stable security definer
-set search_path = public
-as $$
-  select exists (
-    select 1 from public.hotel_memberships m
-    where m.hotel_id = target_hotel and m.user_id = auth.uid() and m.active
-  );
-$$;
-
-create or replace function public.has_hotel_role(target_hotel uuid, allowed_roles text[])
-returns boolean
-language sql stable security definer
-set search_path = public
-as $$
-  select exists (
-    select 1 from public.hotel_memberships m
-    where m.hotel_id = target_hotel and m.user_id = auth.uid()
-      and m.active and m.role = any(allowed_roles)
-  );
-$$;
+-- Authorization is enforced by the CoreStay API in Vercel Functions.
+-- No Supabase auth schema or browser-side database access is required.
 
 create table if not exists public.rooms (
   id uuid primary key default gen_random_uuid(),
