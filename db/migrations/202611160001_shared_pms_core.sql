@@ -4,12 +4,27 @@
 
 create extension if not exists pgcrypto;
 
+-- SaaS organization boundary. One tenant may own multiple hotel properties.
+create table if not exists public.tenants (
+  id uuid primary key default gen_random_uuid(),
+  tenant_code text not null unique,
+  name text not null,
+  status text not null default 'ACTIVE' check (status in ('ACTIVE','SUSPENDED','CLOSED')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+
 create table if not exists public.hotels (
   id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete restrict,
   name text not null,
   timezone text not null default 'Asia/Makassar',
+  currency char(3) not null default 'IDR',
+  country_code char(2) not null default 'ID',
   business_date date,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (tenant_id, id)
 );
 
 -- Application identities are managed by the CoreStay API (Vercel Functions).
@@ -35,14 +50,27 @@ create table if not exists public.user_sessions (
 
 create index if not exists idx_user_sessions_user_expiry on public.user_sessions(user_id, expires_at);
 
+create table if not exists public.tenant_memberships (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  user_id uuid not null references public.app_users(id) on delete cascade,
+  status text not null default 'ACTIVE' check (status in ('INVITED','ACTIVE','SUSPENDED','REMOVED')),
+  created_at timestamptz not null default now(),
+  unique (tenant_id, user_id),
+  unique (tenant_id, id)
+);
+
 create table if not exists public.hotel_memberships (
   id uuid primary key default gen_random_uuid(),
-  hotel_id uuid not null references public.hotels(id) on delete cascade,
+  tenant_id uuid not null,
+  hotel_id uuid not null,
   user_id uuid not null references public.app_users(id) on delete cascade,
   role text not null check (role in ('owner','admin','front_office','housekeeping','outlet','inventory','purchasing','accounting','auditor')),
   active boolean not null default true,
   created_at timestamptz not null default now(),
-  unique (hotel_id, user_id)
+  unique (hotel_id, user_id),
+  foreign key (tenant_id, hotel_id) references public.hotels(tenant_id, id) on delete cascade,
+  foreign key (tenant_id, user_id) references public.tenant_memberships(tenant_id, user_id) on delete cascade
 );
 
 -- Authorization is enforced by the CoreStay API in Vercel Functions.
@@ -498,3 +526,82 @@ create index if not exists idx_audit_events_hotel_time on public.audit_events(ho
 -- session, verify hotel_memberships and role permissions, validate hotel_id,
 -- and execute each business posting inside a SQL transaction.
 -- Do not grant direct database credentials to end-user devices.
+
+
+-- Tenant and property context is set only by trusted Vercel server code inside
+-- a transaction. Never accept these values as authorization claims from browser input.
+create or replace function public.corestay_current_tenant_id()
+returns uuid language sql stable
+as $$ select nullif(current_setting('app.tenant_id', true), '')::uuid $$;
+
+create or replace function public.corestay_current_hotel_id()
+returns uuid language sql stable
+as $$ select nullif(current_setting('app.hotel_id', true), '')::uuid $$;
+
+alter table public.tenants enable row level security;
+alter table public.tenants force row level security;
+create policy tenant_boundary on public.tenants
+  using (id = public.corestay_current_tenant_id())
+  with check (id = public.corestay_current_tenant_id());
+
+alter table public.hotels enable row level security;
+alter table public.hotels force row level security;
+create policy hotel_tenant_boundary on public.hotels
+  using (tenant_id = public.corestay_current_tenant_id()
+    and (public.corestay_current_hotel_id() is null or id = public.corestay_current_hotel_id()))
+  with check (tenant_id = public.corestay_current_tenant_id()
+    and (public.corestay_current_hotel_id() is null or id = public.corestay_current_hotel_id()));
+
+alter table public.tenant_memberships enable row level security;
+alter table public.tenant_memberships force row level security;
+create policy tenant_membership_boundary on public.tenant_memberships
+  using (tenant_id = public.corestay_current_tenant_id())
+  with check (tenant_id = public.corestay_current_tenant_id());
+
+-- Apply the same tenant/property boundary to every operational table carrying hotel_id.
+-- The hotels lookup itself is protected by hotel_tenant_boundary above.
+do $$
+declare
+  t record;
+begin
+  for t in
+    select distinct table_name
+    from information_schema.columns
+    where table_schema = 'public'
+      and column_name = 'hotel_id'
+      and table_name not in ('hotels')
+  loop
+    execute format('alter table public.%I enable row level security', t.table_name);
+    execute format('alter table public.%I force row level security', t.table_name);
+    execute format(
+      'create policy tenant_hotel_boundary on public.%I
+       using (exists (
+         select 1 from public.hotels h
+         where h.id = hotel_id
+           and h.tenant_id = public.corestay_current_tenant_id()
+           and (public.corestay_current_hotel_id() is null or h.id = public.corestay_current_hotel_id())
+       ))
+       with check (exists (
+         select 1 from public.hotels h
+         where h.id = hotel_id
+           and h.tenant_id = public.corestay_current_tenant_id()
+           and (public.corestay_current_hotel_id() is null or h.id = public.corestay_current_hotel_id())
+       ))',
+      t.table_name
+    );
+  end loop;
+end $$;
+
+-- Audit events are immutable; corrections must be recorded as new events.
+create or replace function public.corestay_prevent_audit_mutation()
+returns trigger language plpgsql as $$
+begin
+  raise exception 'audit_events is append-only';
+end;
+$$;
+
+drop trigger if exists audit_events_no_mutation on public.audit_events;
+create trigger audit_events_no_mutation
+  before update or delete on public.audit_events
+  for each row execute function public.corestay_prevent_audit_mutation();
+
