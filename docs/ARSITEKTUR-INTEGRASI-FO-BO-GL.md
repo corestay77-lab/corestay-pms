@@ -2,7 +2,7 @@
 
 ## Sasaran penggunaan
 
-Satu komputer utama dan beberapa perangkat lain dapat membuka hotel yang sama. Semua perangkat membaca dan menulis ke satu PostgreSQL terpusat. Browser tidak lagi menjadi sumber data utama; browser hanya menjadi antarmuka dan cache sementara.
+Satu komputer utama dan beberapa perangkat lain dapat membuka hotel yang sama. Semua perangkat membaca dan menulis ke satu PostgreSQL terpusat. Satu tenant (organisasi pelanggan) dapat memiliki beberapa hotel/properti. Browser tidak lagi menjadi sumber data utama; browser hanya menjadi antarmuka dan cache sementara.
 
 ## Pilihan arsitektur
 
@@ -12,7 +12,7 @@ Vercel menyediakan hosting dan Functions; database SQL pusat disediakan melalui 
 - **Database pusat:** Neon Postgres dari Vercel Marketplace, dibuat dan dihubungkan dari Vercel Dashboard. Tidak menggunakan Supabase.
 - **Login dan hak akses:** CoreStay API pada Vercel Functions menggunakan tabel `app_users`, `user_sessions`, dan `hotel_memberships`; password wajib di-hash dan session cookie HttpOnly, Secure, SameSite.
 - **Sinkronisasi:** semua perangkat membaca/menulis melalui API Vercel ke PostgreSQL pusat; layar memperbarui data setelah server mengonfirmasi dan melakukan refresh berkala.
-- **Keamanan:** `DATABASE_URL` hanya tersedia pada Vercel Functions. API memeriksa session, `hotel_id`, role, dan izin; browser tidak pernah mengakses database langsung.
+- **Keamanan:** `DATABASE_URL` hanya tersedia pada Vercel Functions. API memeriksa session, tenant, `hotel_id`, role, dan izin; PostgreSQL RLS menjadi lapisan isolasi tambahan. Setiap request menjalankan transaksi dengan `SET LOCAL app.tenant_id` dan, bila perlu, `SET LOCAL app.hotel_id`. Browser tidak pernah mengakses database langsung.
 - **Hosting/backend:** Vercel menyajikan aplikasi dan menjalankan API melalui Vercel Functions.
 - **Transaksi penting:** gunakan PostgreSQL RPC/transaction untuk posting, pembayaran, check-out, penerimaan barang, pembayaran supplier/customer, dan Night Audit.
 
@@ -35,7 +35,7 @@ ACCOUNT/ACC_D menjadi Chart of Accounts. JURNAL/JURNAL_D menjadi jurnal header/d
 
 ## Aturan integrasi wajib
 
-Semua query database dilakukan di server melalui Vercel Functions dengan parameterized SQL. Database credential tidak pernah dikirim ke browser. Gunakan transaksi SQL atomik untuk pembayaran, check-out, penerimaan barang, posting stok, dan Night Audit.
+Semua query database dilakukan di server melalui Vercel Functions dengan parameterized SQL. Database credential tidak pernah dikirim ke browser. Gunakan transaksi SQL atomik untuk pembayaran, check-out, penerimaan barang, posting stok, dan Night Audit. Runtime DB role bukan superuser/BYPASSRLS; konteks tenant/properti diatur server-side dalam transaksi yang sama.
 
 1. Setiap dokumen memiliki ID internal UUID dan nomor dokumen yang terlihat pengguna.
 2. Setiap posting membawa `hotel_id`, tanggal bisnis, modul sumber, ID sumber, pengguna, dan waktu.
@@ -50,8 +50,8 @@ Semua query database dilakukan di server melalui Vercel Functions dengan paramet
 
 ## Menjaga data lama
 
-- Tidak ada penghapusan atau reset pada `localStorage` key `corestay-pms-v2`.
-- Migration SQL ini hanya menambah struktur di database cloud baru; tidak menyentuh data browser atau DBF sumber.
+- Tidak ada penghapusan atau reset pada `localStorage` key `corestay-pms-v3` (key yang saat ini dideklarasikan di `app.js`).
+- Migration SQL ini hanya menambah struktur di database cloud baru; tidak menyentuh data browser atau DBF sumber. Tabel `tenants`, `tenant_memberships`, `hotels` dengan `tenant_id`, serta kebijakan RLS mengisolasi organisasi dan properti.
 - Sebelum migrasi transaksi, aplikasi harus mengekspor snapshot JSON dari browser yang selama ini menyimpan data utama.
 - Snapshot disimpan apa adanya ke `legacy_data_snapshots` dengan checksum; snapshot yang sama tidak dapat diimpor dua kali.
 - Sesudah snapshot diverifikasi, data dipetakan per modul dengan laporan jumlah record dan saldo kontrol. Data lama tetap disimpan sampai pemilik menyetujui hasil rekonsiliasi.
@@ -62,7 +62,7 @@ Semua query database dilakukan di server melalui Vercel Functions dengan paramet
 ### Tahap 1 — Infrastruktur Vercel
 - Dari Vercel Dashboard project CoreStay, pasang integrasi Neon Postgres melalui Marketplace dan buat database baru khusus CoreStay.
 - Hubungkan database ke project dan pastikan `DATABASE_URL` tersedia sebagai server-only Environment Variable.
-- Jalankan migration `db/migrations/202611160001_shared_pms_core.sql` hanya pada database baru yang kosong setelah review.
+- Jalankan migration `db/migrations/202611160001_shared_pms_core.sql` hanya pada database baru yang kosong setelah review. Bootstrap tenant dan hotel pertama melalui backend tepercaya dengan konteks tenant transaksional.
 - Bootstrap akun owner secara aman melalui API satu kali.
 
 ### Tahap 2 — Migrasi aman
