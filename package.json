@@ -6,6 +6,10 @@
   "engines": {
     "node": ">=20"
   },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check api/health.js"
+  },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2"
   }
