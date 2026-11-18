@@ -1,0 +1,8 @@
+# Local secrets and dependencies
+.env
+.env.*
+!.env.example
+node_modules/
+.vercel/
+.DS_Store
+npm-debug.log*
