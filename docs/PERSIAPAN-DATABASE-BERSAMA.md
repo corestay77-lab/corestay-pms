@@ -1,6 +1,6 @@
 # Persiapan database bersama CoreStay di Vercel
 
-CoreStay memakai Vercel untuk hosting aplikasi dan API, dengan Neon Postgres yang dipasang melalui Vercel Marketplace sebagai database pusat. Tidak menggunakan Supabase.
+CoreStay memakai Vercel untuk hosting aplikasi dan API, dengan Neon Postgres yang dipasang melalui Vercel Marketplace sebagai database pusat. Tidak menggunakan Supabase. Skema mendukung tenant organisasi dan beberapa hotel di bawah tenant yang sama, dengan RLS untuk isolasi tenant/properti.
 
 ## Langkah pemilik project
 
@@ -14,7 +14,7 @@ CoreStay memakai Vercel untuk hosting aplikasi dan API, dengan Neon Postgres yan
 
 ## Data yang tetap aman
 
-Aplikasi saat ini memakai browser localStorage key `corestay-pms-v2`. Nilai ini tidak boleh dihapus atau ditimpa selama pembangunan. Sebelum cutover, aplikasi harus mengekspor snapshot JSON asli, menyimpan checksum, lalu memetakan data ke tabel baru dan merekonsiliasi jumlah record serta saldo kontrol.
+Aplikasi saat ini memakai browser localStorage key `corestay-pms-v3` (sesuai deklarasi saat ini di `app.js`). Nilai ini tidak boleh dihapus atau ditimpa selama pembangunan. Sebelum cutover, aplikasi harus mengekspor snapshot JSON asli, menyimpan checksum, lalu memetakan data ke tabel baru dan merekonsiliasi jumlah record serta saldo kontrol.
 
 Database pusat tidak mengambil alih transaksi sampai backup, import, dan pengujian multi-perangkat disetujui pemilik.
 
@@ -28,4 +28,4 @@ Database pusat tidak mengambil alih transaksi sampai backup, import, dan penguji
 
 ## Status
 
-Belum ada database yang dibuat, belum ada SQL yang dijalankan, dan belum ada data lama yang dipindahkan. Ini adalah rencana persiapan; produksi tetap memakai sistem yang ada sampai cutover disetujui.
+Belum ada database yang dibuat, belum ada SQL yang dijalankan, dan belum ada data lama yang dipindahkan. Draft migration menyiapkan tabel FO–BO–GL, identitas, tenant, properti, dan RLS; ini belum berarti database aktif atau aplikasi sudah tersambung. Produksi tetap memakai sistem yang ada sampai cutover disetujui.
