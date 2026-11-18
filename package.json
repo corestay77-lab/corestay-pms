@@ -1,0 +1,16 @@
+{
+  "name": "corestay-pms",
+  "version": "3.0.0",
+  "private": true,
+  "description": "CoreStay PMS — Vercel-hosted hotel operations platform",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check api/health.js && node --check backup.js && node --check app.js && node --check shell.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2"
+  }
+}

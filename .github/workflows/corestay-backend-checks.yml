@@ -1,0 +1,27 @@
+name: CoreStay backend checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, feature/corestay-multitenant-db]
+
+permissions:
+  contents: read
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Check API syntax
+        run: npm run check
+      - name: Run backend tests
+        run: npm test
