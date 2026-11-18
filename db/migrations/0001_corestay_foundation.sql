@@ -194,6 +194,17 @@ ALTER TABLE hotel_membership_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hotel_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+-- Apply RLS even to table owners; superusers/BYPASSRLS roles still bypass by design.
+ALTER TABLE tenants FORCE ROW LEVEL SECURITY;
+ALTER TABLE hotels FORCE ROW LEVEL SECURITY;
+ALTER TABLE tenant_memberships FORCE ROW LEVEL SECURITY;
+ALTER TABLE hotel_memberships FORCE ROW LEVEL SECURITY;
+ALTER TABLE roles FORCE ROW LEVEL SECURITY;
+ALTER TABLE role_permissions FORCE ROW LEVEL SECURITY;
+ALTER TABLE hotel_membership_roles FORCE ROW LEVEL SECURITY;
+ALTER TABLE hotel_settings FORCE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
+
 CREATE POLICY tenant_isolation ON tenants
   USING (id = app_current_tenant_id())
   WITH CHECK (id = app_current_tenant_id());
