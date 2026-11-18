@@ -71,3 +71,8 @@ Pengujian lewat simulasi Node, belum di browser sungguhan.
 
 ## Belum tercakup
 Integrasi key-card/PABX, cetak registrasi/bill/kwitansi, split folio, void/reprint POS, laporan per segmen (STISTIK 218 kolom), import langsung DBF, multi-user/database server, resep (satu item POS = banyak bahan), nomor akun bank selain 140.09 (140.10 dan 140.11 adalah asumsi), neraca format lengkap.
+
+
+## Backup data browser
+
+Gunakan tombol **Backup data** pada header untuk mengekspor salinan data browser dari storage key `corestay-pms-v3`. Ekspor meminta konfirmasi, memvalidasi struktur data, dan menyertakan checksum SHA-256 untuk pemeriksaan integritas. File JSON diunduh ke perangkat; data browser tidak diubah, dihapus, dikirim ke server, atau diimpor otomatis. Simpan file backup di tempat aman karena dapat berisi data tamu dan transaksi. Fitur ini hanya ekspor—belum ada fungsi restore/import.
