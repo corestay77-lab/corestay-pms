@@ -10,7 +10,7 @@ let queryResult = [{
   hotels_ready: true,
   users_ready: true,
   audit_ready: true,
-    tenant_integrity_ready: true
+  tenant_integrity_ready: true
 }];
 let queryError = null;
 
@@ -96,6 +96,24 @@ test('reports migration_required when a foundation table is missing', async () =
 
   assert.equal(res.statusCode, 503);
   assert.equal(res.body.ok, false);
+  assert.equal(res.body.schema, 'migration_required');
+});
+
+
+test('requires same-hotel integrity constraints before reporting ready', async () => {
+  queryError = null;
+  queryResult = [{
+    checked_at: '2026-11-18T00:00:00.000Z',
+    tenants_ready: true,
+    hotels_ready: true,
+    users_ready: true,
+    audit_ready: true,
+    tenant_integrity_ready: false
+  }];
+  const res = responseRecorder();
+  await handler({ method: 'GET' }, res);
+
+  assert.equal(res.statusCode, 503);
   assert.equal(res.body.schema, 'migration_required');
 });
 
