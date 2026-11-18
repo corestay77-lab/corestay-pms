@@ -25,7 +25,7 @@ Migration `db/migrations/0001_corestay_foundation.sql` creates:
 - `audit_logs`: append-only audit history.
 - `schema_migrations`: applied migration registry.
 
-Tenant-scoped tables have PostgreSQL Row-Level Security policies. The database context must be set by trusted backend code within a transaction. The application must use a restricted runtime database role, not the schema owner/superuser, because owners and roles with BYPASSRLS can bypass RLS unless FORCE ROW LEVEL SECURITY is applied and ownership is handled appropriately.
+Tenant-scoped tables have PostgreSQL Row-Level Security policies. The database context must be set by trusted backend code within a transaction. The migration applies FORCE ROW LEVEL SECURITY to tenant-scoped tables, so ordinary table owners are also subject to policies. Superusers and roles with BYPASSRLS still bypass RLS by design; never use either as the Vercel runtime role. Use a dedicated restricted runtime role and keep migration ownership credentials out of the application.
 
 ## Apply to a new PostgreSQL database
 
