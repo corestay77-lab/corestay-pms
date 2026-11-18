@@ -1,0 +1,12 @@
+{
+  "name": "corestay-pms",
+  "version": "3.0.0",
+  "private": true,
+  "description": "CoreStay PMS — Vercel-hosted hotel operations platform",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2"
+  }
+}
