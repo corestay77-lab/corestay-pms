@@ -66,7 +66,7 @@ Semua query database dilakukan di server melalui Vercel Functions dengan paramet
 - Bootstrap akun owner secara aman melalui API satu kali.
 
 ### Tahap 2 — Migrasi aman
-- Tambahkan halaman export/backup dari localStorage.
+- Tombol **Backup data** pada header mengekspor snapshot localStorage `corestay-pms-v3` ke JSON dengan checksum SHA-256; fitur ini hanya ekspor dan tidak mengubah data browser. Restore/import tetap menunggu proses dry-run dan rekonsiliasi.
 - Arsipkan snapshot di cloud tanpa mengubah data lokal.
 - Buat pemetaan bertahap: master → reservasi/stay/folio → POS/deposit/payment → inventory/purchasing/AP/AR → GL.
 - Rekonsiliasi total folio, saldo deposit, stok, AP, AR, dan trial balance.
