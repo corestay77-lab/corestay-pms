@@ -28,14 +28,28 @@ module.exports = async function handler(req, res) {
         to_regclass('public.tenants') is not null as tenants_ready,
         to_regclass('public.hotels') is not null as hotels_ready,
         to_regclass('public.app_users') is not null as users_ready,
-        to_regclass('public.audit_events') is not null as audit_ready
+        to_regclass('public.audit_events') is not null as audit_ready,
+        (
+          select count(*) = 6
+          from pg_constraint
+          where convalidated
+            and conname = any(array[
+              'fk_reservations_guest_same_hotel',
+              'fk_pos_checks_folio_same_hotel',
+              'fk_stock_movements_item_same_hotel',
+              'fk_ap_invoices_supplier_same_hotel',
+              'fk_gl_lines_journal_same_hotel',
+              'fk_gl_lines_account_same_hotel'
+            ])
+        ) as tenant_integrity_ready
     `;
     const schema = rows[0];
     const ready = Boolean(
       schema.tenants_ready &&
       schema.hotels_ready &&
       schema.users_ready &&
-      schema.audit_ready
+      schema.audit_ready &&
+      schema.tenant_integrity_ready
     );
 
     return res.status(ready ? 200 : 503).json({
