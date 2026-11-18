@@ -8,7 +8,7 @@ CoreStay memakai Vercel untuk hosting aplikasi dan API, dengan Neon Postgres yan
 2. Pilih integrasi **Neon Postgres** dan buat database baru khusus CoreStay PMS. Jangan hubungkan database lain yang sudah berisi data.
 3. Pilih region terdekat yang tersedia dan hubungkan database ke project CoreStay.
 4. Pastikan `DATABASE_URL` tersedia sebagai Environment Variable server-side di Vercel. Jangan gunakan prefix `NEXT_PUBLIC_` dan jangan kirim nilainya melalui chat.
-5. Setelah API dan migration direview, jalankan `db/migrations/202611160001_shared_pms_core.sql` pada database baru yang kosong.
+5. Setelah review, jalankan kedua migration secara berurutan pada database baru yang kosong: `202611160001_shared_pms_core.sql`, lalu `202611180001_tenant_safe_foreign_keys.sql`.
 6. Buat akun owner melalui proses bootstrap satu kali yang disediakan API; jangan membuka pendaftaran admin publik.
 7. Deploy ulang project setelah environment variable tersedia.
 
@@ -20,14 +20,14 @@ Database pusat tidak mengambil alih transaksi sampai backup, import, dan penguji
 
 ## Keamanan
 
-Setelah migration diterapkan, buat runtime role terpisah (contoh nama `corestay_app`) yang bukan superuser, bukan pemilik tabel, dan tidak memiliki atribut `BYPASSRLS`. Berikan hak minimum dari koneksi admin/migration:
+Setelah kedua migration diterapkan, runtime role harus terpisah dari migration/admin role, bukan superuser, bukan pemilik tabel, dan tidak memiliki atribut `BYPASSRLS`. Jangan memberikan hak akses massal ke seluruh tabel identitas. `app_users` dan `user_sessions` belum memiliki alur autentikasi final; hak aksesnya tidak boleh diberikan kepada runtime role transaksi sampai kebijakan login/session dan pembatasan row-level-nya dirancang serta diuji. Berikan grant per tabel hanya setelah setiap API dan kebijakan RLS siap. Hindari pola `GRANT ... ON ALL TABLES` berikut untuk deployment:
 
 ```sql
+-- Template role saja; grant tabel dilakukan bertahap setelah review.
 CREATE ROLE corestay_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
 GRANT USAGE ON SCHEMA public TO corestay_app;
-GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO corestay_app;
-REVOKE UPDATE, DELETE ON public.audit_events FROM corestay_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO corestay_app;
+-- Jangan jalankan GRANT ALL TABLES. Tambahkan hak per tabel setelah
+-- autentikasi, membership, RLS, dan endpoint terkait selesai diuji.
 ```
 
 Simpan password role dan pooled `DATABASE_URL` hanya di Environment Variables Vercel. Jangan menggunakan migration/owner role sebagai runtime role.
