@@ -9,7 +9,8 @@ let queryResult = [{
   tenants_ready: true,
   hotels_ready: true,
   users_ready: true,
-  audit_ready: true
+  audit_ready: true,
+    tenant_integrity_ready: true
 }];
 let queryError = null;
 
@@ -68,7 +69,8 @@ test('reports readiness only when every foundation table exists', async () => {
     tenants_ready: true,
     hotels_ready: true,
     users_ready: true,
-    audit_ready: true
+    audit_ready: true,
+    tenant_integrity_ready: true
   }];
   const res = responseRecorder();
   await handler({ method: 'GET' }, res);
@@ -86,7 +88,8 @@ test('reports migration_required when a foundation table is missing', async () =
     tenants_ready: true,
     hotels_ready: true,
     users_ready: true,
-    audit_ready: false
+    audit_ready: false,
+    tenant_integrity_ready: true
   }];
   const res = responseRecorder();
   await handler({ method: 'GET' }, res);
