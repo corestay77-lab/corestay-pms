@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "check": "node --check api/health.js"
+    "check": "node --check api/health.js && node --check backup.js && node --check app.js && node --check shell.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2"
