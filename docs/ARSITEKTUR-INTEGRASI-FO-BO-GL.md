@@ -51,7 +51,7 @@ Semua query database dilakukan di server melalui Vercel Functions dengan paramet
 ## Menjaga data lama
 
 - Tidak ada penghapusan atau reset pada `localStorage` key `corestay-pms-v3` (key yang saat ini dideklarasikan di `app.js`).
-- Migration SQL ini hanya menambah struktur di database cloud baru; tidak menyentuh data browser atau DBF sumber. Tabel `tenants`, `tenant_memberships`, `hotels` dengan `tenant_id`, serta kebijakan RLS mengisolasi organisasi dan properti.
+- Kedua migration SQL hanya menambah struktur di database cloud baru; migration kedua menambahkan foreign key gabungan agar relasi antar-record tetap berada pada hotel yang sama. Keduanya tidak menyentuh data browser atau DBF sumber. Tabel `tenants`, `tenant_memberships`, `hotels` dengan `tenant_id`, serta kebijakan RLS mengisolasi organisasi dan properti.
 - Sebelum migrasi transaksi, aplikasi harus mengekspor snapshot JSON dari browser yang selama ini menyimpan data utama.
 - Snapshot disimpan apa adanya ke `legacy_data_snapshots` dengan checksum; snapshot yang sama tidak dapat diimpor dua kali.
 - Sesudah snapshot diverifikasi, data dipetakan per modul dengan laporan jumlah record dan saldo kontrol. Data lama tetap disimpan sampai pemilik menyetujui hasil rekonsiliasi.
@@ -62,7 +62,7 @@ Semua query database dilakukan di server melalui Vercel Functions dengan paramet
 ### Tahap 1 — Infrastruktur Vercel
 - Dari Vercel Dashboard project CoreStay, pasang integrasi Neon Postgres melalui Marketplace dan buat database baru khusus CoreStay.
 - Hubungkan database ke project dan pastikan `DATABASE_URL` tersedia sebagai server-only Environment Variable.
-- Jalankan migration `db/migrations/202611160001_shared_pms_core.sql` hanya pada database baru yang kosong setelah review. Bootstrap tenant dan hotel pertama melalui backend tepercaya dengan konteks tenant transaksional.
+- Review lalu jalankan migration `202611160001_shared_pms_core.sql` dan `202611180001_tenant_safe_foreign_keys.sql` secara berurutan, hanya pada database baru yang kosong. Bootstrap tenant dan hotel pertama melalui backend tepercaya dengan konteks tenant transaksional.
 - Bootstrap akun owner secara aman melalui API satu kali.
 
 ### Tahap 2 — Migrasi aman
