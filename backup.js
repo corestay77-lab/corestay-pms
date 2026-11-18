@@ -43,7 +43,8 @@
           throw new Error('Browser ini tidak mendukung checksum SHA-256. Gunakan browser modern melalui HTTPS.');
         }
 
-        const bytes = new TextEncoder().encode(raw);
+        const payloadJson = JSON.stringify(payload);
+        const bytes = new TextEncoder().encode(payloadJson);
         const digest = await window.crypto.subtle.digest('SHA-256', bytes);
         const checksum = Array.from(new Uint8Array(digest))
           .map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -53,7 +54,7 @@
           formatVersion: 1,
           storageKey: STORAGE_KEY,
           exportedAt: new Date().toISOString(),
-          checksum: { algorithm: 'SHA-256', scope: 'payload JSON UTF-8 bytes', value: checksum },
+          checksum: { algorithm: 'SHA-256', scope: 'UTF-8 bytes of JSON.stringify(payload)', value: checksum },
           payload
         };
 
@@ -67,7 +68,7 @@
         document.body.appendChild(link);
         link.click();
         link.remove();
-        URL.revokeObjectURL(url);
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 
         status.textContent = 'Backup berhasil dibuat. SHA-256: ' + checksum;
         button.textContent = 'Backup siap';
